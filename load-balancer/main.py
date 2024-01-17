@@ -1,10 +1,15 @@
 import time
 from datetime import timedelta
 
+import docker
+
+client = docker.from_env()
+
 import requests
 
 RESPONSE_TIMES = []
 REQUESTS_PER_MINUTE = 6
+
 # Acceptable response time
 # Upper: 1.5 seconds
 # Lower: 1.0 seconds
