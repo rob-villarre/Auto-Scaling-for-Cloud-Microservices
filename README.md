@@ -7,6 +7,7 @@
 ## Running Instructions
 
 ```
+sudo apt-get install python3-docker
 virtualenv venv --python=python3.8
 source venv/bin/activate
 ```
