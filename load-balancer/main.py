@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import docker
 
-client = docker.DockerClient(base_url="unix://var/run/docker.sock")
+client = docker.from_env()
 
 import requests
 
@@ -20,9 +20,15 @@ LOWER = 1.0
 if __name__ == "__main__":
     start_time = time.time()
 
+    # webapp_service = client.services.list(filters={"name": "app_name_web"})[0]
+
+    # replicas = webapp_service.attrs['Spec']['Mode']['Replicated']['Replicas']
+
+    # print(replicas)
+
     for _ in range(REQUESTS_PER_MINUTE):
         response = requests.get("http://10.2.9.11:8000", timeout=3)
-        delta = timedelta(hours=2, minutes=30, seconds=45)
+        # delta = timedelta(hours=2, minutes=30, seconds=45)
         elapsed_seconds = response.elapsed.total_seconds()
 
         print(f"Response time: {elapsed_seconds} seconds")
