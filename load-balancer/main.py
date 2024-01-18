@@ -74,7 +74,7 @@ def get_response_time():
         return None
 
 def scale_up(average_response_time):
-    if average_response_time >= config['upper_threshold']:
+    if (average_response_time >= config['upper_threshold'] and dockerapi.replicas() < config['max_replicas']):
          # Scale up by rounded value of (average_response_time / upper_threshold_value) instances
         replicas = dockerapi.replicas() + round(average_response_time / config['upper_threshold'])
         # Cannot scale up past set maximum number of replicas
@@ -89,7 +89,7 @@ def scale_up(average_response_time):
         print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
 def scale_down(average_response_time):
-    if average_response_time <= config['lower_threshold']:
+    if (average_response_time <= config['lower_threshold'] and dockerapi.replicas() > config['min_replicas']):
         # Scale down by rounded value of (lower_threshold_value / average_response_time) instances
         replicas = dockerapi.replicas() - round(config['lower_threshold'] / average_response_time)
         # Cannot scale down past set minimum number of replicas
