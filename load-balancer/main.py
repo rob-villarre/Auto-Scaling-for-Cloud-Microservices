@@ -11,13 +11,9 @@ class Docker:
     
     def scale(self, replicas):
 
-        if (replicas >= config['max_replicas'] or replicas <= config['min_replicas']):
-            return
-
         self.service.scale(replicas)
         while True:
-            # reload service attrs from docker server
-            self.service.reload()
+            
             # if service finished scaling
             if self.replicas() == replicas:
                 break
@@ -25,6 +21,8 @@ class Docker:
 
     # returns current number of replicas
     def replicas(self):
+        # reload service attrs from docker server
+        self.service.reload()
         return self.service.attrs['Spec']['Mode']['Replicated']['Replicas']
 
 class ResponseTimeList:
@@ -69,14 +67,20 @@ def load_balancer():
         # start scaling once response times array is full
         if len(RESPONSE_TIMES.list) < RESPONSE_TIMES.max_size:
             return
-
+        
         if average_response_time > config['upper_threshold']:
-            dockerapi.scale(min(dockerapi.replicas() + config['scale_step'], config['max_replicas']))
+            replicas = dockerapi.replicas() + config['scale_step']
+            if replicas >= config['max_replicas']:
+                return
+            dockerapi.scale(replicas)
             print(f"Service scaled up to {dockerapi.replicas()} replicas")
             time.sleep(5)
-        
+
         if average_response_time < config['lower_threshold']:
-            dockerapi.scale(max(dockerapi.replicas() - config['scale_step'], config['min_replicas']))
+            replicas = dockerapi.replicas() - config['scale_step']
+            if replicas <= config['min_replicas']:
+                return
+            dockerapi.scale(replicas)
             print(f"Service scaled down to {dockerapi.replicas()} replicas")
             time.sleep(5)
 
