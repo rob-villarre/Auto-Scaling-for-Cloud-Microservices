@@ -47,7 +47,7 @@ dockerapi = Docker(client, config['service_name'])
 
 RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
 
-def load_balancer():
+def get_response_time():
     response_time = None
     try:
         # TODO: change timeout to better value?
@@ -56,39 +56,42 @@ def load_balancer():
         t1 = time.time()
         # response_time = response.elapsed.total_seconds()
         response_time = t1 - t0
-    
+        return response_time 
     # TODO handle timeout
     except requests.exceptions.Timeout as timeout:
         response_time = config['upper_threshold'] * 2
+        return response_time    
     # TODO handle all other exceptions
     except requests.exceptions.RequestException as e:
         print(e)
+        return None
+
+def scale_up(average_response_time):
+    if average_response_time > config['upper_threshold']:
+        replicas = dockerapi.replicas() + config['scale_step']
+        if replicas < config['max_replicas']:
+            dockerapi.scale(replicas)
+            print(f"Service scaled up to {dockerapi.replicas()} replicas")
+
+def scale_down(average_response_time):
+    if average_response_time < config['lower_threshold']:
+        replicas = dockerapi.replicas() - config['scale_step']
+        if replicas > config['min_replicas']:
+            dockerapi.scale(replicas)
+            print(f"Service scaled down to {dockerapi.replicas()} replicas")
+
+def load_balancer():
+    response_time = get_response_time()
     
     print(f"Response time: {response_time} seconds")
     RESPONSE_TIMES.append(response_time)
     average_response_time = RESPONSE_TIMES.average()
     print(RESPONSE_TIMES.list)
-    print(
-        f"Average response time is: {average_response_time} seconds"
-    )
+    print(f"Average response time is: {average_response_time} seconds")
 
-    # start scaling once response times array is full
-    if len(RESPONSE_TIMES.list) < RESPONSE_TIMES.max_size:
-        return
-    
-    if average_response_time > config['upper_threshold']:
-        replicas = dockerapi.replicas() + config['scale_step']
-        if replicas >= config['max_replicas']:
-            return
-        dockerapi.scale(replicas)
-        print(f"Service scaled up to {dockerapi.replicas()} replicas")
+    scale_up(average_response_time)
+    scale_down(average_response_time)
 
-    if average_response_time < config['lower_threshold']:
-        replicas = dockerapi.replicas() - config['scale_step']
-        if replicas <= config['min_replicas']:
-            return
-        dockerapi.scale(replicas)
-        print(f"Service scaled down to {dockerapi.replicas()} replicas")
 
 if __name__ == "__main__":
     schedule.every(config['poll_interval']).seconds.do(load_balancer)
