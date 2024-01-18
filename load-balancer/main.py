@@ -75,17 +75,34 @@ def get_response_time():
 
 def scale_up(average_response_time):
     if average_response_time >= config['upper_threshold']:
-        replicas = dockerapi.replicas() + config['scale_step']
-        if replicas <= config['max_replicas']:
-            dockerapi.scale(replicas)
-            print(f"Service scaled up to {dockerapi.replicas()} replicas")
+         # Scale up by rounded value of (average_response_time / upper_threshold_value) instances
+        replicas = dockerapi.replicas() + round(average_response_time / config['upper_threshold'])
+        # Cannot scale up past set maximum number of replicas
+        if replicas > config['max_replicas']:
+            replicas = config['max_replicas']
+
+        # Scale up
+        dockerapi.scale(replicas)
+        # Sleep to allow changes to rebalance
+        time.sleep(config['rebalance_await_time'] * round(average_response_time / config['upper_threshold']))
+
+        print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
 def scale_down(average_response_time):
     if average_response_time <= config['lower_threshold']:
-        replicas = dockerapi.replicas() - config['scale_step']
-        if replicas >= config['min_replicas']:
-            dockerapi.scale(replicas)
-            print(f"Service scaled down to {dockerapi.replicas()} replicas")
+        # Scale down by rounded value of (lower_threshold_value / average_response_time) instances
+        replicas = dockerapi.replicas() - round(config['lower_threshold'] / average_response_time)
+        # Cannot scale down past set minimum number of replicas
+        if replicas < config['min_replicas']:
+            replicas = config['min_replicas']
+
+        # Scale down
+        dockerapi.scale(replicas)
+        # Sleep to allow changes to rebalance
+        time.sleep(config['rebalance_await_time'] * round(config['lower_threshold']/average_response_time))
+        
+        print(f"Service scaled down to {dockerapi.replicas()} replicas")
+            
 
 def percentile_response_time(percentile):
     if len(RESPONSE_TIMES.list) == 0:
