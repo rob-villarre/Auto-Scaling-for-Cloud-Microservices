@@ -1,8 +1,11 @@
-poll_interval: 10
+poll_interval: 10 # 10
+time_array_length: 10
 scale_step: 1
-upper_threshold: 2.5
-lower_threshold: 2
 min_replicas: 1
 max_replicas: 30
 service_name: app_name_web
 host: "10.2.9.11:8000"
+
+# Acceptable response time
+upper_threshold: 3.5
+lower_threshold: 2.5

@@ -47,14 +47,7 @@ config = yaml.safe_load(open("./config.yml"))
 client = docker.from_env()
 dockerapi = Docker(client, config['service_name'])
 
-RESPONSE_TIMES = ResponseTimeList(max_size=5)
-
-# Acceptable response time
-# Upper: 1.5 seconds
-# Lower: 1.0 seconds
-
-UPPER = 1.5
-LOWER = 1.0
+RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
 
 def load_balancer():
     try:
@@ -73,13 +66,19 @@ def load_balancer():
             f"Average response time is: {average_response_time} seconds"
         )
 
+        # start scaling once response times array is full
+        if len(RESPONSE_TIMES.list) < RESPONSE_TIMES.max_size:
+            return
+
         if average_response_time > config['upper_threshold']:
-            dockerapi.scale(dockerapi.replicas() + config['scale_step'])
+            dockerapi.scale(min(dockerapi.replicas() + config['scale_step'], config['max_replicas']))
             print(f"Service scaled up to {dockerapi.replicas()} replicas")
+            time.sleep(5)
         
         if average_response_time < config['lower_threshold']:
-            dockerapi.scale(dockerapi.replicas() - config['scale_step'])
+            dockerapi.scale(max(dockerapi.replicas() - config['scale_step'], config['min_replicas']))
             print(f"Service scaled down to {dockerapi.replicas()} replicas")
+            time.sleep(5)
 
     # TODO handle timeout
     except requests.exceptions.Timeout as timeout:
