@@ -6,6 +6,11 @@ import docker
 import numpy as np
 import argparse
 
+parser = argparse.ArgumentParser(description='Choose the metric for load balancing.')
+parser.add_argument('--metric', choices=['average', 'p95'], default='average',
+                help='The metric to use for load balancing (default: average)')
+args = parser.parse_args()
+
 class Docker:
     def __init__(self, client, service_name):
         self.client = client
@@ -69,16 +74,16 @@ def get_response_time():
         return None
 
 def scale_up(average_response_time):
-    if average_response_time > config['upper_threshold']:
+    if average_response_time >= config['upper_threshold']:
         replicas = dockerapi.replicas() + config['scale_step']
-        if replicas < config['max_replicas']:
+        if replicas <= config['max_replicas']:
             dockerapi.scale(replicas)
             print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
 def scale_down(average_response_time):
-    if average_response_time < config['lower_threshold']:
+    if average_response_time <= config['lower_threshold']:
         replicas = dockerapi.replicas() - config['scale_step']
-        if replicas > config['min_replicas']:
+        if replicas >= config['min_replicas']:
             dockerapi.scale(replicas)
             print(f"Service scaled down to {dockerapi.replicas()} replicas")
 
@@ -92,20 +97,16 @@ def load_balancer():
     
     print(f"Response time: {response_time} seconds")
     RESPONSE_TIMES.append(response_time)
-    # TODO: might do 95th percentile if time allows
-    average_response_time = RESPONSE_TIMES.average()
-    print(RESPONSE_TIMES.list)
-    print(f"Average response time is: {average_response_time} seconds")
 
-    scale_up(average_response_time)
-    scale_down(average_response_time)
-    
-    # p95_response_time = percentile_response_time(95)
-    # print(RESPONSE_TIMES.list)
-    # print(f"P95 response time is: {p95_response_time} seconds")
+    if args.metric == 'average':
+        metric_response_time = RESPONSE_TIMES.average()
+        print(f"Average response time is: {metric_response_time} seconds")
+    else:
+        metric_response_time = percentile_response_time(95)
+        print(f"P95 response time is: {metric_response_time} seconds")
 
-    # scale_up(p95_response_time)
-    # scale_down(p95_response_time)
+    scale_up(metric_response_time)
+    scale_down(metric_response_time)
 
 if __name__ == "__main__":
     schedule.every(config['poll_interval']).seconds.do(load_balancer)

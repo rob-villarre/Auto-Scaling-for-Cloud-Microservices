@@ -1,6 +1,6 @@
-poll_interval: 10 # 10
+poll_interval: 10 # 10 5 2 3 10
 time_array_length: 10
-scale_step: 1
+scale_step: 3 # 1 2 3
 min_replicas: 1
 max_replicas: 30
 service_name: app_name_web
