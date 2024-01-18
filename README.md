@@ -19,7 +19,11 @@ source venv/bin/activate
 ```
 pip install -r requirements.txt
 ```
-- Run
+- Run using 95th percentile metric
 ```
-sudo python3 main.py
+sudo python3 main.py --metric p95
+```
+Or using average of runtime
+```
+sudo python3 main.py --metric average
 ```
