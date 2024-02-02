@@ -1,4 +1,4 @@
-poll_interval: 10 # 10 5 2 3 10
+poll_interval: 5 # 10 5 2 3 10
 time_array_length: 10
 min_replicas: 1
 max_replicas: 30

@@ -1,10 +1,10 @@
 import time
-import schedule
 import requests
 import yaml
 import docker
 import numpy as np
 import argparse
+import math
 
 parser = argparse.ArgumentParser(description='Choose the metric for load balancing.')
 parser.add_argument('--metric', choices=['average', 'p95'], default='average',
@@ -54,19 +54,26 @@ dockerapi = Docker(client, config['service_name'])
 
 RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
 
+# set to a value when load balancer scales.
+# it will monitor response times for that many intervals before scaling again.
+MONITOR_PERIODS = 0
+TIMED_OUT = False
+
 def get_response_time():
     response_time = None
+    global TIMED_OUT
     try:
-        # TODO: change timeout to better value?
         t0 = time.time()
         requests.get(f"http://{config['host']}", timeout=(config['upper_threshold'] * 2))
         t1 = time.time()
         # response_time = response.elapsed.total_seconds()
         response_time = t1 - t0
+        TIMED_OUT = False
         return response_time 
-    # TODO handle timeout
     except requests.exceptions.Timeout as timeout:
+        # setting to *2 to increase number of replicants to scale by
         response_time = config['upper_threshold'] * 2
+        TIMED_OUT = True
         return response_time    
     # TODO handle all other exceptions
     except requests.exceptions.RequestException as e:
@@ -84,7 +91,10 @@ def scale_up(average_response_time):
         # Scale up
         dockerapi.scale(replicas)
         # Sleep to allow changes to rebalance
-        time.sleep(config['rebalance_await_time'] * round(average_response_time / config['upper_threshold']))
+        # time.sleep(config['rebalance_await_time'] * round(average_response_time / config['upper_threshold']))
+
+        global MONITOR_PERIODS
+        MONITOR_PERIODS = 3
 
         print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
@@ -99,7 +109,9 @@ def scale_down(average_response_time):
         # Scale down
         dockerapi.scale(replicas)
         # Sleep to allow changes to rebalance
-        time.sleep(config['rebalance_await_time'] * round(config['lower_threshold']/average_response_time))
+        # time.sleep(config['rebalance_await_time'] * round(config['lower_threshold']/average_response_time))
+        global MONITOR_PERIODS
+        MONITOR_PERIODS = 3
         
         print(f"Service scaled down to {dockerapi.replicas()} replicas")
             
@@ -111,6 +123,9 @@ def percentile_response_time(percentile):
 
 def load_balancer():
     response_time = get_response_time()
+
+    if response_time is None:
+        return
     
     print(f"Response time: {response_time} seconds")
     RESPONSE_TIMES.append(response_time)
@@ -122,13 +137,19 @@ def load_balancer():
         metric_response_time = percentile_response_time(95)
         print(f"P95 response time is: {metric_response_time} seconds")
 
-    scale_up(metric_response_time)
-    scale_down(metric_response_time)
+    global MONITOR_PERIODS
+    print(f"mp:{MONITOR_PERIODS}")
+    if MONITOR_PERIODS == 0:
+        scale_up(metric_response_time)
+        scale_down(metric_response_time)
+    else:
+        MONITOR_PERIODS -= 1
 
 if __name__ == "__main__":
-    schedule.every(config['poll_interval']).seconds.do(load_balancer)
-
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        load_balancer()
+        if TIMED_OUT is False and MONITOR_PERIODS == 0:
+            time.sleep(config['poll_interval'])
+        else:
+            time.sleep(1)
 

@@ -1,14 +1,14 @@
-from locust import HttpUser, TaskSet, task, constant
+from locust import HttpUser, TaskSet, task, constant_throughput
 from locust import LoadTestShape
 
 class UserTasks(TaskSet):
   @task
   def get_root(self):
-    self.client.get("/")
+    self.client.get("http://localhost:8000")
 
 
 class WebsiteUser(HttpUser):
-  wait_time = constant(0.5)
+  wait_time = constant_throughput(0.5)
   tasks = [UserTasks]
 
 # https://github.com/locustio/locust/blob/master/examples/custom_shape/stages.py
@@ -29,11 +29,11 @@ class WaveShape(LoadTestShape):
   """
 
   stages = [
-    {"duration": 100, "users": 10, "spawn_rate": 10},
-    {"duration": 200, "users": 100, "spawn_rate": 50},
-    {"duration": 300, "users": 1000, "spawn_rate": 100},
-    {"duration": 400, "users": 100, "spawn_rate": 50},
-    {"duration": 500, "users": 10, "spawn_rate": 10},
+    {"duration": 1*120, "users": 5, "spawn_rate": 1},
+    {"duration": 2*120, "users": 10, "spawn_rate": 1},
+    {"duration": 3*120, "users": 20, "spawn_rate": 1},
+    {"duration": 4*120, "users": 10, "spawn_rate": 1},
+    {"duration": 5*120, "users": 5, "spawn_rate": 1},
   ]
 
   def tick(self):
@@ -45,3 +45,50 @@ class WaveShape(LoadTestShape):
         return tick_data
 
     return None
+  
+
+# from locust import HttpUser, TaskSet, task, between
+# import time
+
+# class MyTaskSet(TaskSet):
+#     @task
+#     def my_task(self):
+#         # Your task logic goes here
+#         self.client.get("http://localhost:8000/")
+
+# class MyUser(HttpUser):
+#     tasks = [MyTaskSet]
+#     wait_time = between(1, 2)  # Adjust as needed
+#     current_rate = 1  # Initial requests per second
+#     duration = 10  # Duration in minutes for doubling/halving requests
+#     halving_counter = 0  # Counter for halving iterations
+
+#     def on_start(self):
+#         for _ in range(self.duration):
+#             self.user.tasks[0].my_task()
+#             time.sleep(60)  # Wait for one minute
+#             self.adjust_task_rate(double=True)
+
+#         while self.halving_counter < 10:
+#             self.user.tasks[0].my_task()
+#             time.sleep(60)  # Wait for one minute
+#             self.adjust_task_rate(double=False)
+#             self.halving_counter += 1
+
+#         # Restart the test after 10 halving iterations
+#         self.halving_counter = 0
+#         self.on_start()
+
+#     def adjust_task_rate(self, double=True):
+#         if double:
+#             # Double the rate
+#             self.current_rate *= 2
+#         else:
+#             # Halve the rate
+#             self.current_rate /= 2
+
+#         # Adjust wait time and target_user_count
+#         self.user.wait_time = between(1/self.current_rate, 2/self.current_rate)
+#         self.environment.runner.target_user_count = self.current_rate
+
+# # Example: locust -f yourfile.py --host=http://your-website.com
