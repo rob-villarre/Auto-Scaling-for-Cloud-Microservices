@@ -1,0 +1,39 @@
+Start Program
+
+Parse arguments for 'average' or '95percentile' (default 'average')
+
+Set the configuration variables
+    poll_interval
+    min_replicas
+    max_replicas
+    service_name
+    host_IP
+    upper_threshold
+    lower_threshold
+    num_reqs_for_average
+
+Set reponse_times_array[num_reqs_for_average]
+
+define get_response_time() 
+    make request to host
+    return time_after_request - time_before_request
+
+loop:
+    response_times_array.append(get_reponse_time())
+    if arg = average:
+        avg_response_time = average(reponse_times_array)
+    else if arg = 95percentile
+        avg_response_time = average(top 95 of Response_times_array)
+    
+    if no need to wait intervals:
+        if avg_response_time > upper_threshold and num_active_dockers < max_replicas:
+            scale_up(num_reps_to_add = round(avg_response_time / upper_threshold))
+        else if avg_response_time < lower_threshold and num_active_dockers > min_replicas:
+            scale_down(num_reps_to_remove = round(lower_threshold / avg_response_time))
+    wait 3 intervals
+    
+    sleep(poll_interval);
+
+    
+    
+    

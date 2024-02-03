@@ -4,7 +4,36 @@ import yaml
 import docker
 import numpy as np
 import argparse
-import math
+import plotext as plt
+
+
+import plotext as plt
+
+replica_data = {'time': [], 'replicas': []}
+
+def show_plot():
+    plt.date_form("M:S")
+    replicas = replica_data['replicas']
+    times = plt.datetimes_to_string(replica_data['time'])
+
+    plt.plot(times, replicas)
+    plt.theme("dark")
+    plt.xlim(times[0])
+    plt.ylim(config['min_replicas'], config['max_replicas'])
+    plt.interactive(True)
+    yticks = [i for i in range(1, 30+1)]
+    ylabels = [str(i) for i in range(1, 30+1)]
+    plt.yticks(yticks, ylabels)
+
+    plt.xfrequency(len(times))
+
+    plt.title("Number of Replicas Over Time")
+    plt.xlabel("Time")
+    plt.ylabel(f"Replica Count: {dockerapi.replicas()}")
+    plt.show()
+    # print(times)
+    # print(replicas)
+
 
 parser = argparse.ArgumentParser(description='Choose the metric for load balancing.')
 parser.add_argument('--metric', choices=['average', 'p95'], default='average',
@@ -77,7 +106,7 @@ def get_response_time():
         return response_time    
     # TODO handle all other exceptions
     except requests.exceptions.RequestException as e:
-        print(e)
+        # print(e)
         return None
 
 def scale_up(average_response_time):
@@ -90,13 +119,17 @@ def scale_up(average_response_time):
 
         # Scale up
         dockerapi.scale(replicas)
+        # Reset the array of response times
+
+        # global RESPONSE_TIMES
+        # RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
         # Sleep to allow changes to rebalance
         # time.sleep(config['rebalance_await_time'] * round(average_response_time / config['upper_threshold']))
 
         global MONITOR_PERIODS
-        MONITOR_PERIODS = 3
+        MONITOR_PERIODS = 2
 
-        print(f"Service scaled up to {dockerapi.replicas()} replicas")
+        # print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
 def scale_down(average_response_time):
     if (average_response_time <= config['lower_threshold'] and dockerapi.replicas() > config['min_replicas']):
@@ -108,12 +141,15 @@ def scale_down(average_response_time):
 
         # Scale down
         dockerapi.scale(replicas)
+        # Reset the array of response times
+        # global RESPONSE_TIMES
+        # RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
         # Sleep to allow changes to rebalance
         # time.sleep(config['rebalance_await_time'] * round(config['lower_threshold']/average_response_time))
         global MONITOR_PERIODS
-        MONITOR_PERIODS = 3
+        MONITOR_PERIODS = 2
         
-        print(f"Service scaled down to {dockerapi.replicas()} replicas")
+        # print(f"Service scaled down to {dockerapi.replicas()} replicas")
             
 
 def percentile_response_time(percentile):
@@ -127,18 +163,18 @@ def load_balancer():
     if response_time is None:
         return
     
-    print(f"Response time: {response_time} seconds")
+    #print(f"Response time: {response_time} seconds")
     RESPONSE_TIMES.append(response_time)
 
     if args.metric == 'average':
         metric_response_time = RESPONSE_TIMES.average()
-        print(f"Average response time is: {metric_response_time} seconds")
+        #print(f"Average response time is: {metric_response_time} seconds")
     else:
         metric_response_time = percentile_response_time(95)
-        print(f"P95 response time is: {metric_response_time} seconds")
+        #print(f"P95 response time is: {metric_response_time} seconds")
 
     global MONITOR_PERIODS
-    print(f"mp:{MONITOR_PERIODS}")
+    #print(f"mp:{MONITOR_PERIODS}") 
     if MONITOR_PERIODS == 0:
         scale_up(metric_response_time)
         scale_down(metric_response_time)
@@ -148,6 +184,9 @@ def load_balancer():
 if __name__ == "__main__":
     while True:
         load_balancer()
+        replica_data['time'].append(plt.today_datetime())
+        replica_data['replicas'].append(dockerapi.replicas())
+        show_plot()
         if TIMED_OUT is False and MONITOR_PERIODS == 0:
             time.sleep(config['poll_interval'])
         else:
