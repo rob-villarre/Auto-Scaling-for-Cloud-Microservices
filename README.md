@@ -27,3 +27,7 @@ Or using average of runtime
 ```
 sudo python3 main.py --metric average
 ```
+While the file main.py is running, run locust to obtain the graph by typing in terminal:
+```
+locust
+```
