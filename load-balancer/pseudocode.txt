@@ -28,12 +28,15 @@ loop:
     if no need to wait intervals:
         if avg_response_time > upper_threshold and num_active_dockers < max_replicas:
             scale_up(num_reps_to_add = round(avg_response_time / upper_threshold))
+            then monitor for 2 intervals
         else if avg_response_time < lower_threshold and num_active_dockers > min_replicas:
             scale_down(num_reps_to_remove = round(lower_threshold / avg_response_time))
-    wait 3 intervals
+            then monitor for 2 intervals
+    else
+        monitor_intervals - 1
     
     sleep(poll_interval);
+    plot number of replicas
 
-    
-    
+End Program  
     

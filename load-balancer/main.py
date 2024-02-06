@@ -12,6 +12,8 @@ import plotext as plt
 replica_data = {'time': [], 'replicas': []}
 
 def show_plot():
+    # plt.subplots(2,1)
+    # plt.subplot(1,1)
     plt.date_form("M:S")
     replicas = replica_data['replicas']
     times = plt.datetimes_to_string(replica_data['time'])
@@ -21,9 +23,10 @@ def show_plot():
     plt.xlim(times[0])
     plt.ylim(config['min_replicas'], config['max_replicas'])
     plt.interactive(True)
-    yticks = [i for i in range(1, 30+1)]
-    ylabels = [str(i) for i in range(1, 30+1)]
+    yticks = [i for i in range(config['min_replicas'], config['max_replicas']+1)]
+    ylabels = [str(i) for i in range(config['min_replicas'], config['max_replicas']+1)]
     plt.yticks(yticks, ylabels)
+    plt.yfrequency(config['max_replicas'])
 
     plt.xfrequency(len(times))
 
@@ -31,8 +34,28 @@ def show_plot():
     plt.xlabel("Time")
     plt.ylabel(f"Replica Count: {dockerapi.replicas()}")
     plt.show()
-    # print(times)
-    # print(replicas)
+
+    # plt.subplot(2,1)
+    # plt.date_form("M:S")
+    # replicas = replica_data['replicas']
+    # times = plt.datetimes_to_string(replica_data['time'])
+
+    # plt.plot(times, replicas)
+    # plt.theme("dark")
+    # plt.xlim(times[0])
+    # plt.ylim(config['min_replicas'], config['max_replicas'])
+    # plt.interactive(True)
+    # yticks = [i for i in range(config['min_replicas'], config['max_replicas']+1)]
+    # ylabels = [str(i) for i in range(config['min_replicas'], config['max_replicas']+1)]
+    # plt.yticks(yticks, ylabels)
+    # plt.yfrequency(config['max_replicas'])
+
+    # plt.xfrequency(len(times))
+
+    # plt.title("Number of Replicas Over Time")
+    # plt.xlabel("Time")
+    # plt.ylabel(f"Replica Count: {dockerapi.replicas()}")
+    # plt.show()
 
 
 parser = argparse.ArgumentParser(description='Choose the metric for load balancing.')

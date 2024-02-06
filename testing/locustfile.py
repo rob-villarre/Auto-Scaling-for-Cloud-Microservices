@@ -1,5 +1,13 @@
-from locust import HttpUser, TaskSet, task, constant_throughput
-from locust import LoadTestShape
+from locust import HttpUser, TaskSet, task, constant_throughput, events, LoadTestShape
+
+@events.request.add_listener
+def my_request_handler(request_type, name, response_time, response_length, response,
+                       context, exception, start_time, url, **kwargs):
+    if exception:
+        print(f"Request to {name} failed with exception {exception}")
+    else:
+        print(f"Successfully made a request to: {start_time}")
+        print(f"The response was {response.text}")
 
 class UserTasks(TaskSet):
   @task
@@ -29,11 +37,11 @@ class WaveShape(LoadTestShape):
   """
 
   stages = [
-    {"duration": 1*120, "users": 5, "spawn_rate": 1},
-    {"duration": 2*120, "users": 10, "spawn_rate": 1},
-    {"duration": 3*120, "users": 20, "spawn_rate": 1},
-    {"duration": 4*120, "users": 10, "spawn_rate": 1},
-    {"duration": 5*120, "users": 5, "spawn_rate": 1},
+    {"duration": 1*120, "users": 5, "spawn_rate": 5},
+    {"duration": 2*120, "users": 10, "spawn_rate": 10},
+    {"duration": 3*120, "users": 20, "spawn_rate": 20},
+    {"duration": 4*120, "users": 10, "spawn_rate": 10},
+    {"duration": 5*120, "users": 5, "spawn_rate": 5},
   ]
 
   def tick(self):
