@@ -2,7 +2,6 @@ import time
 import requests
 import yaml
 import docker
-import numpy as np
 import argparse
 import plotext as plt
 
@@ -13,8 +12,6 @@ replica_data = {"time": [], "replicas": []}
 
 
 def show_plot():
-    # plt.subplots(2,1)
-    # plt.subplot(1,1)
     plt.date_form("M:S")
     replicas = replica_data["replicas"]
     times = plt.datetimes_to_string(replica_data["time"])
@@ -36,40 +33,18 @@ def show_plot():
     plt.title("Number of Replicas Over Time")
     plt.xlabel("Time")
     plt.ylabel(f"Replica Count: {dockerapi.replicas()}")
+    plt.clear_terminal()
     plt.show()
 
-    # plt.subplot(2,1)
-    # plt.date_form("M:S")
-    # replicas = replica_data['replicas']
-    # times = plt.datetimes_to_string(replica_data['time'])
 
-    # plt.plot(times, replicas)
-    # plt.theme("dark")
-    # plt.xlim(times[0])
-    # plt.ylim(config['min_replicas'], config['max_replicas'])
-    # plt.interactive(True)
-    # yticks = [i for i in range(config['min_replicas'], config['max_replicas']+1)]
-    # ylabels = [str(i) for i in range(config['min_replicas'], config['max_replicas']+1)]
-    # plt.yticks(yticks, ylabels)
-    # plt.yfrequency(config['max_replicas'])
-
-    # plt.xfrequency(len(times))
-
-    # plt.title("Number of Replicas Over Time")
-    # plt.xlabel("Time")
-    # plt.ylabel(f"Replica Count: {dockerapi.replicas()}")
-    # plt.show()
-
-
-parser = argparse.ArgumentParser(description="Choose the metric for load balancing.")
+parser = argparse.ArgumentParser(description="Choose state of scaling for load balancing.")
 parser.add_argument(
-    "--metric",
-    choices=["average", "p95"],
-    default="average",
-    help="The metric to use for load balancing (default: average)",
+    "--scale",
+    choices=["on", "off"],
+    default="on",
+    help="Control auto-scaling (deafult: on)",
 )
 args = parser.parse_args()
-
 
 class Docker:
     def __init__(self, client, service_name):
@@ -113,24 +88,17 @@ config = yaml.safe_load(open("./config.yml"))
 client = docker.from_env()
 dockerapi = Docker(client, config["service_name"])
 
-RESPONSE_TIMES = ResponseTimeList(max_size=config["time_array_length"])
-
-# set to a value when load balancer scales.
-# it will monitor response times for that many intervals before scaling again.
-MONITOR_PERIODS = 0
-TIMED_OUT = False
-
-
 class LoadBalancer:
-    def __init__(self, config, dockerapi, response_times, monitor_periods):
+    def __init__(self, config, dockerapi):
         self.config = config
         self.dockerapi = dockerapi
-        self.response_times = response_times
-        self.monitor_periods = monitor_periods
+        self.response_times = ResponseTimeList(self.config['time_array_length'])
+        # it will monitor response times for that many intervals before scaling again.
+        self.monitor_periods = self.config['monitor_periods']
+        self.timed_out = False
 
     def get_response_time(self):
         response_time = None
-        global TIMED_OUT
         try:
             t0 = time.time()
             requests.get(
@@ -140,18 +108,22 @@ class LoadBalancer:
             t1 = time.time()
             # response_time = response.elapsed.total_seconds()
             response_time = t1 - t0
-            TIMED_OUT = False
+            self.timed_out = False
             return response_time
         except requests.exceptions.Timeout as timeout:
             # setting to *2 to increase number of replicants to scale by
             response_time = self.config["upper_threshold"] * 2
-            TIMED_OUT = True
+            self.timed_out = True
             return response_time
-        # TODO handle all other exceptions
         except requests.exceptions.RequestException as e:
-            # print(e)
             return None
 
+    
+    def percentile_response_time(self, percentile):
+        if len(self.response_times.list) == 0:
+            return None
+        return np.percentile(self.response_times.list, percentile)
+    
     def scale_up(self, average_response_time):
         if (
             average_response_time >= self.config["upper_threshold"]
@@ -167,14 +139,8 @@ class LoadBalancer:
 
             # Scale up
             self.dockerapi.scale(replicas)
-            # Reset the array of response times
 
-            # global RESPONSE_TIMES
-            # RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
-            # Sleep to allow changes to rebalance
-            # time.sleep(config['rebalance_await_time'] * round(average_response_time / config['upper_threshold']))
-
-            self.monitor_periods = 2
+            self.monitor_periods = self.config['monitor_periods']
 
             # print(f"Service scaled up to {dockerapi.replicas()} replicas")
 
@@ -193,22 +159,14 @@ class LoadBalancer:
 
             # Scale down
             self.dockerapi.scale(replicas)
-            # Reset the array of response times
-            # global RESPONSE_TIMES
-            # RESPONSE_TIMES = ResponseTimeList(max_size=config['time_array_length'])
-            # Sleep to allow changes to rebalance
-            # time.sleep(config['rebalance_await_time'] * round(config['lower_threshold']/average_response_time))
-            self.monitor_periods = 2
+
+            self.monitor_periods = self.config['monitor_periods']
 
             # print(f"Service scaled down to {dockerapi.replicas()} replicas")
 
-    def percentile_response_time(self, percentile):
-        if len(self.response_times.list) == 0:
-            return None
-        return np.percentile(self.response_times.list, percentile)
-
     def load_balancer(self):
         response_time = self.get_response_time()
+
 
         if response_time is None:
             return
@@ -216,28 +174,30 @@ class LoadBalancer:
         # print(f"Response time: {response_time} seconds")
         self.response_times.append(response_time)
 
-        if args.metric == "average":
-            metric_response_time = self.response_times.average()
-            # print(f"Average response time is: {metric_response_time} seconds")
-        else:
-            metric_response_time = self.percentile_response_time(95)
-            # print(f"P95 response time is: {metric_response_time} seconds")
+        metric_response_time = self.response_times.average()
+        # print(f"Average response time is: {metric_response_time} seconds")
 
         if self.monitor_periods == 0:
-            self.scale_up(metric_response_time)
-            self.scale_down(metric_response_time)
+            if args.scale == "on":
+                self.scale_up(metric_response_time)
+                self.scale_down(metric_response_time)
         else:
             self.monitor_periods -= 1
+            
 
+    def run(self):
+        while True:
+            lb.load_balancer()
+            replica_data["time"].append(plt.today_datetime())
+            replica_data["replicas"].append(dockerapi.replicas())
+            show_plot()
+
+            if self.timed_out is False and self.monitor_periods == 0:
+                time.sleep(config["poll_interval"])
+            else:
+                time.sleep(1)
 
 if __name__ == "__main__":
-    lb = LoadBalancer(config, dockerapi, RESPONSE_TIMES, MONITOR_PERIODS)
-    while True:
-        lb.load_balancer()
-        replica_data["time"].append(plt.today_datetime())
-        replica_data["replicas"].append(dockerapi.replicas())
-        show_plot()
-        if TIMED_OUT is False and MONITOR_PERIODS == 0:
-            time.sleep(config["poll_interval"])
-        else:
-            time.sleep(1)
+    lb = LoadBalancer(config, dockerapi)
+    lb.run()
+

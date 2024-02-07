@@ -4,8 +4,7 @@ min_replicas: 1
 max_replicas: 30
 service_name: app_name_web
 host: "10.2.9.11:8000"
-rebalance_await_time: 5
-
+monitor_periods: 2
 # Acceptable response time
 upper_threshold: 4.5
 lower_threshold: 2
