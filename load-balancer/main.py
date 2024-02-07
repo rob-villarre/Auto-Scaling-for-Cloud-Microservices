@@ -13,6 +13,7 @@ replica_data = {"time": [], "replicas": []}
 
 def show_plot():
     plt.date_form("M:S")
+    
     replicas = replica_data["replicas"]
     times = plt.datetimes_to_string(replica_data["time"])
 
@@ -118,7 +119,6 @@ class LoadBalancer:
         except requests.exceptions.RequestException as e:
             return None
 
-    
     def percentile_response_time(self, percentile):
         if len(self.response_times.list) == 0:
             return None
