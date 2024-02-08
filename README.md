@@ -31,3 +31,4 @@ While the file main.py is running, run locust to obtain the graph by typing in t
 ```
 locust
 ```
+Locust asks for the host `http://localhost:8000/` but the Locust client itself runs on `http://localhost:8089/` in a browser.

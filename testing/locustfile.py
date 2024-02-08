@@ -1,13 +1,4 @@
-from locust import HttpUser, TaskSet, task, constant_throughput, events, LoadTestShape
-
-@events.request.add_listener
-def my_request_handler(request_type, name, response_time, response_length, response,
-                       context, exception, start_time, url, **kwargs):
-    if exception:
-        print(f"Request to {name} failed with exception {exception}")
-    else:
-        print(f"Successfully made a request to: {start_time}")
-        print(f"The response was {response.text}")
+from locust import HttpUser, TaskSet, task, constant_throughput, LoadTestShape
 
 class UserTasks(TaskSet):
   @task
